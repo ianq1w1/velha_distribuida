@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", function() {
         [0, 4, 8], [2, 4, 6]
     ];
     let gameOver = false;
+    let myTurn = true; // Adicione essa variável para controlar os turnos
 
     function createBoard() {
         for (let i = 0; i < 3; i++) {
@@ -26,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function handleCellClick(event) {
-        if (gameOver) return;
+        if (gameOver || !myTurn) return;
 
         const clickedCell = event.target;
         const row = parseInt(clickedCell.dataset.row);
@@ -36,8 +37,21 @@ document.addEventListener("DOMContentLoaded", function() {
         if (cells[cellIndex].textContent === "") {
             cells[cellIndex].textContent = currentPlayer;
             sendMoveToServer({ position: cellIndex }); // Enviar o movimento para o servidor
+            myTurn = false; // Alterna o turno após o movimento
         }
     }
+
+    function sendMoveToServer(moveData) {
+        // Enviar o movimento para o servidor
+        socket.emit('move', moveData);
+    }
+
+    // Receber movimentos do servidor e atualizar o jogo
+    socket.on('move', (data) => {
+        cells[data.position].textContent = data.symbol;
+        checkWinner();
+        myTurn = true; // É a vez do jogador após receber o movimento do oponente
+    });
 
     function sendMoveToServer(moveData) {
         // Enviar o movimento para o servidor
