@@ -1,95 +1,97 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const path = require('path');
+const socket = io('http://10.35.5.74:8080');
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+document.addEventListener("DOMContentLoaded", function() {
+    const boardElement = document.getElementById("board");
+    const cells = [];
+    let currentPlayer = "X";
+    const winningCombinations = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+    ];
+    let gameOver = false;
 
-let currentPlayer = 'X'; // Inicializa com o jogador 'X' (jogador 1)
-let gameBoard = Array(9).fill(''); // Tabuleiro do jogo
-
-// Armazena o ID do jogador atualmente em turno
-let currentPlayerSocket = null;
-
-app.get('/', function(req, res) {  
-    res.sendFile(path.join(__dirname, './index.html'))
-})
-
-app.get('/velha.js', function(req, res) {  
-    res.sendFile(path.join(__dirname, './velha.js'))
-})
-
-io.on('connection', (socket) => {
-    console.log('Novo cliente conectado:', socket.id);
-
-    socket.emit('currentPlayer', currentPlayer); // Envio do jogador atual para o cliente
-
-    socket.on('move', (data) => {
-        if (currentPlayerSocket === socket && currentPlayer === 'X') {
-            if (gameBoard[data.position] === '') {
-                gameBoard[data.position] = 'X'; // Registra a jogada do jogador X no tabuleiro
-                io.sockets.emit('move', { symbol: 'X', position: data.position }); // Envia o movimento para os clientes
-                if (checkWinner('X')) {
-                    io.sockets.emit('gameOver', { winner: 'X' }); // Envia o evento de fim do jogo com o vencedor 'X'
-                } else if (!gameBoard.some(cell => cell === '')) {
-                    io.sockets.emit('gameOver', { winner: 'Draw' }); // Envia o evento de fim do jogo com empate
-                } else {
-                    currentPlayer = 'O'; // Muda para o jogador 'O'
-                    currentPlayerSocket = null;
-                    io.sockets.emit('currentPlayer', currentPlayer); // Envia o novo jogador atual para os clientes
-                }
-            }
-        } else if (currentPlayerSocket === socket && currentPlayer === 'O') {
-            if (gameBoard[data.position] === '') {
-                gameBoard[data.position] = 'O'; // Registra a jogada do jogador O no tabuleiro
-                io.sockets.emit('move', { symbol: 'O', position: data.position }); // Envia o movimento para os clientes
-                if (checkWinner('O')) {
-                    io.sockets.emit('gameOver', { winner: 'O' }); // Envia o evento de fim do jogo com o vencedor 'O'
-                } else if (!gameBoard.some(cell => cell === '')) {
-                    io.sockets.emit('gameOver', { winner: 'Draw' }); // Envia o evento de fim do jogo com empate
-                } else {
-                    currentPlayer = 'X'; // Muda para o jogador 'X'
-                    currentPlayerSocket = null;
-                    io.sockets.emit('currentPlayer', currentPlayer); // Envia o novo jogador atual para os clientes
-                }
+    function createBoard() {
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                const cell = document.createElement("div");
+                cell.classList.add("cell");
+                cell.dataset.row = i;
+                cell.dataset.col = j;
+                cell.addEventListener("click", handleCellClick);
+                cells.push(cell);
+                boardElement.appendChild(cell);
             }
         }
-    });
-
-    function checkWinner(symbol) {
-        const winningCombinations = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],
-            [0, 4, 8], [2, 4, 6]
-        ];
-    
-        return winningCombinations.some(combination => {
-            const [a, b, c] = combination;
-            return gameBoard[a] === symbol && gameBoard[b] === symbol && gameBoard[c] === symbol;
-        })
     }
 
-    socket.on('disconnect', () => {
-        console.log('Cliente desconectado:', socket.id);
-        if (socket === currentPlayerSocket) {
-            currentPlayerSocket = null;
+    function handleCellClick(event) {
+        if (gameOver) return;
+
+        const clickedCell = event.target;
+        const row = parseInt(clickedCell.dataset.row);
+        const col = parseInt(clickedCell.dataset.col);
+        const cellIndex = row * 3 + col;
+
+        if (cells[cellIndex].textContent === "") {
+            cells[cellIndex].textContent = currentPlayer;
+            sendMoveToServer({ position: cellIndex }); // Enviar o movimento para o servidor
         }
+    }
+
+    function sendMoveToServer(moveData) {
+        // Enviar o movimento para o servidor
+        socket.emit('move', moveData);
+    }
+
+    // Receber movimentos do servidor e atualizar o jogo
+    socket.on('move', (data) => {
+        cells[data.position].textContent = data.symbol;
+        checkWinner();
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
     });
 
-    socket.on('join', () => {
-        // Define o primeiro jogador como 'X' quando um novo jogador se junta
-        if (currentPlayerSocket === null) {
-            currentPlayerSocket = socket;
-            currentPlayer = 'X'; // O primeiro jogador será sempre 'X'
-            socket.emit('currentPlayer', currentPlayer);
+    function checkWinner() {
+        for (let i = 0; i < winningCombinations.length; i++) {
+            const [a, b, c] = winningCombinations[i];
+            if (
+                cells[a].textContent !== "" &&
+                cells[a].textContent === cells[b].textContent &&
+                cells[a].textContent === cells[c].textContent
+            ) {
+                gameOver = true;
+                highlightWinnerCells(cells[a], cells[b], cells[c]);
+                setTimeout(() => {
+                    alert(`O jogador ${cells[a].textContent} venceu!`);
+                    resetBoard();
+                }, 200);
+                return;
+            }
         }
-    });
-});
 
-const serverIP = '10.35.5.74';
-const port = 8080;
-server.listen(port, serverIP, () => {
-    console.log('Servidor rodando na porta 8080');
+        if (!cells.some(cell => cell.textContent === "")) {
+            gameOver = true;
+            setTimeout(() => {
+                alert("Empate!");
+                resetBoard();
+            }, 200);
+        }
+    }
+
+    function highlightWinnerCells(cellA, cellB, cellC) {
+        cellA.style.backgroundColor = "lightgreen";
+        cellB.style.backgroundColor = "lightgreen";
+        cellC.style.backgroundColor = "lightgreen";
+    }
+
+    function resetBoard() {
+        cells.forEach(cell => {
+            cell.textContent = "";
+            cell.style.backgroundColor = "";
+        });
+        currentPlayer = "X";
+        gameOver = false;
+    }
+
+    createBoard();
 });
