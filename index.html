@@ -1,0 +1,34 @@
+
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Jogo da Velha Distribuído com Socket.IO</title>
+  <!-- Inclua a biblioteca Socket.IO -->
+  <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+  <style>
+    .board {
+      display: grid; /* Mudança para grid layout */
+      grid-template-columns: repeat(3, 80px); /* 3 colunas de 80px cada */
+      grid-template-rows: repeat(3, 80px); /* 3 linhas de 80px cada */
+      width: 240px;
+      margin: 0 auto;
+    }
+
+    .cell {
+      border: 1px solid #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 36px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jogo da Velha Distribuído com Socket.IO</h1>
+  <div class="board" id="board"></div>
+  <script src="velha.js"></script>
+</body>
+</html>
